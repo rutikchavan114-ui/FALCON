@@ -245,7 +245,10 @@ def run_simulation(request: SimulationRequest):
                 "anomaly_score": float(
                     adaptive["score"]
                 ),
-
+"selected_indices": adaptive["selected_indices"],
+"selected_times": adaptive["selected_times"],
+"schedule_log": adaptive["schedule_log"],
+"features": adaptive["features"],
                 # Decision agreement
                 "agreement": (
                     fixed["decision"]
