@@ -129,9 +129,375 @@ function ScoreBar({ score, threshold }) {
   );
 }
 
+function AdaptiveTrace({ results }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  if (!results?.length) return null;
+
+  const safeIndex = Math.min(
+    selectedIndex,
+    results.length - 1
+  );
+
+  const component = results[safeIndex];
+
+  const schedule = Array.isArray(component?.schedule_log)
+    ? component.schedule_log
+    : [];
+
+  const selectedTimes = Array.isArray(component?.selected_times)
+    ? component.selected_times
+    : [];
+
+  const measurements = Number(
+    component?.falcon_measurements ??
+      component?.measurements ??
+      component?.reads ??
+      selectedTimes.length ??
+      0
+  );
+
+  const totalPoints = Number(
+    component?.total_points ?? 101
+  );
+
+  const sampledPercent =
+    totalPoints > 0
+      ? Math.round((measurements / totalPoints) * 100)
+      : 0;
+
+  const instabilityValues = schedule
+    .filter(
+      (entry) =>
+        typeof entry?.decision_instability === "number"
+    )
+    .map((entry) => ({
+      time: Number(entry.time),
+      instability: Number(
+        entry.decision_instability
+      ),
+    }))
+    .filter(
+      (entry) =>
+        Number.isFinite(entry.time) &&
+        Number.isFinite(entry.instability)
+    );
+
+  const maxTime =
+    Number(
+      component?.total_time ??
+        component?.duration ??
+        5
+    ) || 5;
+
+  const maxInstability = 0.5;
+
+  const decision = String(
+    component?.falcon_decision ??
+      component?.decision ??
+      "UNKNOWN"
+  ).toUpperCase();
+
+  const score = Number(
+    component?.anomaly_score ??
+      component?.score ??
+      0
+  );
+
+  return (
+    <section className="panel adaptive-trace-panel">
+
+      {/* HEADER */}
+
+      <div className="panel-header">
+
+        <div>
+          <div className="section-kicker">
+            ADAPTIVE SAMPLING
+          </div>
+
+          <h2>
+            Measurement Decision Trace
+          </h2>
+        </div>
+
+        <div className="trace-selector">
+
+          <span>
+            COMPONENT
+          </span>
+
+          <select
+            value={safeIndex}
+            onChange={(e) =>
+              setSelectedIndex(
+                Number(e.target.value)
+              )
+            }
+          >
+            {results.map((item, index) => {
+              const id =
+                item.component_id ||
+                item.id ||
+                `C${String(index + 1).padStart(2, "0")}`;
+
+              return (
+                <option
+                  key={id}
+                  value={index}
+                >
+                  {id}
+                </option>
+              );
+            })}
+          </select>
+
+        </div>
+
+      </div>
+
+      {/* SUMMARY */}
+
+      <div className="trace-metrics">
+
+        <div>
+          <span>
+            MEASUREMENTS
+          </span>
+
+          <strong>
+            {measurements} / {totalPoints}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            SAMPLED
+          </span>
+
+          <strong>
+            {sampledPercent}%
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            DECISION
+          </span>
+
+          <strong>
+            {decision}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            ANOMALY SCORE
+          </span>
+
+          <strong>
+            {score.toFixed(2)}
+          </strong>
+        </div>
+
+      </div>
+
+      {/* DECISION INSTABILITY */}
+
+      <div className="trace-section">
+
+        <div className="trace-title">
+          DECISION INSTABILITY
+        </div>
+
+        <div className="instability-chart">
+
+          <div className="instability-axis">
+            <span>0.50</span>
+            <span>0.25</span>
+            <span>0.00</span>
+          </div>
+
+          <div className="instability-plot">
+
+            {/* CONNECTING TRAJECTORY */}
+
+            {instabilityValues.length > 1 && (
+              <svg
+                className="instability-line-layer"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <polyline
+                  points={instabilityValues
+                    .map((point) => {
+                      const x =
+                        maxTime > 0
+                          ? Math.min(
+                              (point.time / maxTime) * 100,
+                              100
+                            )
+                          : 0;
+
+                      const y =
+                        100 -
+                        Math.min(
+                          point.instability /
+                            maxInstability,
+                          1
+                        ) *
+                          100;
+
+                      return `${x},${y}`;
+                    })
+                    .join(" ")}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="0.7"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            )}
+
+            {/* INSTABILITY POINTS */}
+
+            {instabilityValues.map(
+              (point, index) => {
+
+                const left =
+                  maxTime > 0
+                    ? Math.min(
+                        (point.time / maxTime) * 100,
+                        100
+                      )
+                    : 0;
+
+                const bottom =
+                  Math.min(
+                    point.instability /
+                      maxInstability,
+                    1
+                  ) * 100;
+
+                return (
+                  <div
+                    key={`${point.time}-${index}`}
+                    className="instability-point"
+                    style={{
+                      left: `${left}%`,
+                      bottom: `${bottom}%`,
+                    }}
+                    title={`t=${point.time.toFixed(
+                      2
+                    )}s · instability=${point.instability.toFixed(
+                      2
+                    )}`}
+                  />
+                );
+              }
+            )}
+
+          </div>
+
+        </div>
+
+        <div className="trace-axis">
+          <span>0s</span>
+
+          <span>
+            {maxTime.toFixed(1)}s
+          </span>
+        </div>
+
+      </div>
+
+      {/* ACTUAL MEASUREMENT TIMELINE */}
+
+      <div className="trace-section">
+
+        <div className="trace-title">
+          ACTUAL MEASUREMENT TIMELINE
+        </div>
+
+        <div className="sampling-track">
+
+          {selectedTimes.map(
+            (time, index) => {
+
+              const numericTime =
+                Number(time);
+
+              const left =
+                maxTime > 0
+                  ? Math.min(
+                      (numericTime / maxTime) * 100,
+                      100
+                    )
+                  : 0;
+
+              return (
+                <span
+                  key={`${time}-${index}`}
+                  className="sampling-point"
+                  style={{
+                    left: `${left}%`,
+                  }}
+                  title={`Measurement at ${numericTime.toFixed(
+                    2
+                  )}s`}
+                />
+              );
+            }
+          )}
+
+        </div>
+
+        <div className="trace-axis">
+          <span>0s</span>
+
+          <span>
+            {maxTime.toFixed(1)}s
+          </span>
+        </div>
+
+      </div>
+
+      {/* EXPLANATION */}
+
+      <div className="trace-explanation">
+
+        <span className="trace-rule">
+          LOW INSTABILITY
+        </span>
+
+        <span>
+          → sparse measurements
+        </span>
+
+        <span className="trace-divider">
+          |
+        </span>
+
+        <span className="trace-rule">
+          HIGH INSTABILITY
+        </span>
+
+        <span>
+          → dense measurements
+        </span>
+
+      </div>
+
+    </section>
+  );
+}
+
 function App() {
-  const [normalComponents, setNormalComponents] = useState(4);
-  const [anomalousComponents, setAnomalousComponents] = useState(1);
+  const [normalComponents, setNormalComponents] =
+    useState(4);
+
+  const [anomalousComponents, setAnomalousComponents] =
+    useState(1);
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -142,9 +508,15 @@ function App() {
   // ==========================================================
 
   const [csvFile, setCsvFile] = useState(null);
-  const [csvUploading, setCsvUploading] = useState(false);
-  const [csvResult, setCsvResult] = useState(null);
-  const [csvError, setCsvError] = useState("");
+
+  const [csvUploading, setCsvUploading] =
+    useState(false);
+
+  const [csvResult, setCsvResult] =
+    useState(null);
+
+  const [csvError, setCsvError] =
+    useState("");
 
   // ==========================================================
   // SIMULATION ANALYSIS
@@ -165,8 +537,11 @@ function App() {
           },
 
           body: JSON.stringify({
-            normal_components: Number(normalComponents),
-            anomalous_components: Number(anomalousComponents),
+            normal_components:
+              Number(normalComponents),
+
+            anomalous_components:
+              Number(anomalousComponents),
           }),
         }
       );
@@ -177,19 +552,28 @@ function App() {
         );
       }
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      console.log("FALCON API RESPONSE:", data);
+      console.log(
+        "FALCON API RESPONSE:",
+        data
+      );
 
       setResult(data);
+
     } catch (err) {
+
       console.error(err);
 
       setError(
         "Unable to connect to FALCON backend. Make sure FastAPI is running on port 8000."
       );
+
     } finally {
+
       setLoading(false);
+
     }
   }
 
@@ -198,7 +582,9 @@ function App() {
   // ==========================================================
 
   function handleCsvChange(event) {
-    const selectedFile = event.target.files?.[0];
+
+    const selectedFile =
+      event.target.files?.[0];
 
     setCsvError("");
     setCsvResult(null);
@@ -208,8 +594,16 @@ function App() {
       return;
     }
 
-    if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
-      setCsvError("Please select a CSV file.");
+    if (
+      !selectedFile.name
+        .toLowerCase()
+        .endsWith(".csv")
+    ) {
+
+      setCsvError(
+        "Please select a CSV file."
+      );
+
       setCsvFile(null);
       return;
     }
@@ -222,8 +616,13 @@ function App() {
   // ==========================================================
 
   async function uploadCsv() {
+
     if (!csvFile) {
-      setCsvError("Please select a CSV file first.");
+
+      setCsvError(
+        "Please select a CSV file first."
+      );
+
       return;
     }
 
@@ -232,37 +631,55 @@ function App() {
     setCsvResult(null);
 
     try {
-      const formData = new FormData();
 
-      formData.append("file", csvFile);
+      const formData =
+        new FormData();
 
-      const response = await fetch(
-        `${API_BASE}/upload/csv`,
-        {
-          method: "POST",
-          body: formData,
-        }
+      formData.append(
+        "file",
+        csvFile
       );
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          `${API_BASE}/upload/csv`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+      const data =
+        await response.json();
 
       if (!response.ok) {
+
         throw new Error(
-          data.detail || "CSV upload failed."
+          data.detail ||
+            "CSV upload failed."
         );
       }
 
-      console.log("CSV UPLOAD RESPONSE:", data);
+      console.log(
+        "CSV UPLOAD RESPONSE:",
+        data
+      );
 
       setCsvResult(data);
+
     } catch (err) {
+
       console.error(err);
 
       setCsvError(
-        err.message || "Unable to upload CSV dataset."
+        err.message ||
+          "Unable to upload CSV dataset."
       );
+
     } finally {
+
       setCsvUploading(false);
+
     }
   }
 
@@ -276,26 +693,30 @@ function App() {
     result?.component_results ||
     [];
 
-  const reductionRaw = Number(
-    result?.measurement_reduction ??
-      result?.simulation_reduction ??
-      result?.measurement_reduction_ratio ??
-      0
-  );
+  const reductionRaw =
+    Number(
+      result?.measurement_reduction ??
+        result?.simulation_reduction ??
+        result?.measurement_reduction_ratio ??
+        0
+    );
 
-  const agreementRaw = Number(
-    result?.decision_agreement ??
-      result?.decision_agreement_ratio ??
-      0
-  );
+  const agreementRaw =
+    Number(
+      result?.decision_agreement ??
+        result?.decision_agreement_ratio ??
+        0
+    );
 
   const reduction =
-    reductionRaw >= 0 && reductionRaw <= 1
+    reductionRaw >= 0 &&
+    reductionRaw <= 1
       ? reductionRaw * 100
       : reductionRaw;
 
   const agreement =
-    agreementRaw >= 0 && agreementRaw <= 1
+    agreementRaw >= 0 &&
+    agreementRaw <= 1
       ? agreementRaw * 100
       : agreementRaw;
 
@@ -324,20 +745,22 @@ function App() {
       0
     );
 
-  const totalMeasurements = Number(
-    result?.falcon_measurements ??
-      result?.falcon_total_measurements ??
-      result?.total_measurements ??
-      result?.measurements ??
-      calculatedFalconMeasurements
-  );
+  const totalMeasurements =
+    Number(
+      result?.falcon_measurements ??
+        result?.falcon_total_measurements ??
+        result?.total_measurements ??
+        result?.measurements ??
+        calculatedFalconMeasurements
+    );
 
-  const fixedMeasurements = Number(
-    result?.fixed_measurements ??
-      result?.fixed_total_measurements ??
-      result?.fixed_total ??
-      calculatedFixedMeasurements
-  );
+  const fixedMeasurements =
+    Number(
+      result?.fixed_measurements ??
+        result?.fixed_total_measurements ??
+        result?.fixed_total ??
+        calculatedFixedMeasurements
+    );
 
   // ==========================================================
   // RENDER
@@ -374,8 +797,11 @@ function App() {
         </div>
 
         <div className="system-status">
+
           <span className="live-dot" />
+
           SYSTEM ONLINE
+
         </div>
 
       </header>
@@ -401,6 +827,7 @@ function App() {
             <h1>
               Intelligent Burn-in
               <br />
+
               <span>
                 Screening Platform
               </span>
@@ -459,11 +886,17 @@ function App() {
             </div>
 
             <div className="pipeline-indicator">
+
               <span>UPLOAD</span>
+
               <i>→</i>
+
               <span>VALIDATE</span>
+
               <i>→</i>
+
               <span>ANALYZE</span>
+
             </div>
 
           </div>
@@ -473,6 +906,7 @@ function App() {
             <label
               className="control csv-file-control"
             >
+
               <span>
                 CSV Dataset
               </span>
@@ -482,12 +916,15 @@ function App() {
                 accept=".csv,text/csv"
                 onChange={handleCsvChange}
               />
+
             </label>
 
             <div className="csv-file-name">
+
               {csvFile
                 ? csvFile.name
                 : "No dataset selected"}
+
             </div>
 
             <button
@@ -498,6 +935,7 @@ function App() {
                 csvUploading
               }
             >
+
               {csvUploading ? (
                 <>
                   <span className="spinner" />
@@ -509,6 +947,7 @@ function App() {
                   <span>↑</span>
                 </>
               )}
+
             </button>
 
           </div>
@@ -520,6 +959,7 @@ function App() {
           )}
 
           {csvResult && (
+
             <div className="csv-result">
 
               <div className="csv-result-header">
@@ -531,6 +971,7 @@ function App() {
 
                 <div>
                   <span>FILE</span>
+
                   <strong>
                     {csvResult.filename}
                   </strong>
@@ -538,6 +979,7 @@ function App() {
 
                 <div>
                   <span>ROWS</span>
+
                   <strong>
                     {csvResult.summary.rows}
                   </strong>
@@ -545,6 +987,7 @@ function App() {
 
                 <div>
                   <span>COMPONENTS</span>
+
                   <strong>
                     {csvResult.summary.components}
                   </strong>
@@ -552,6 +995,7 @@ function App() {
 
                 <div>
                   <span>VALUE RANGE</span>
+
                   <strong>
                     {csvResult.summary.value_min}
                     {" → "}
@@ -562,6 +1006,7 @@ function App() {
               </div>
 
             </div>
+
           )}
 
         </section>
@@ -587,11 +1032,17 @@ function App() {
             </div>
 
             <div className="pipeline-indicator">
+
               <span>OBSERVE</span>
+
               <i>→</i>
+
               <span>MODEL</span>
+
               <i>→</i>
+
               <span>DECIDE</span>
+
             </div>
 
           </div>
@@ -673,6 +1124,7 @@ function App() {
         {/* ================================================= */}
 
         {!result && !loading && (
+
           <section className="empty-state">
 
             <div className="empty-icon">
@@ -690,6 +1142,7 @@ function App() {
             </p>
 
           </section>
+
         )}
 
         {/* ================================================= */}
@@ -697,6 +1150,7 @@ function App() {
         {/* ================================================= */}
 
         {loading && (
+
           <section className="analysis-loading">
 
             <div className="loading-ring" />
@@ -714,6 +1168,7 @@ function App() {
             </p>
 
           </section>
+
         )}
 
         {/* ================================================= */}
@@ -721,9 +1176,12 @@ function App() {
         {/* ================================================= */}
 
         {result && !loading && (
+
           <>
 
+            {/* ================================================= */}
             {/* METRICS */}
+            {/* ================================================= */}
 
             <section className="metrics-grid">
 
@@ -754,7 +1212,9 @@ function App() {
 
             </section>
 
+            {/* ================================================= */}
             {/* DASHBOARD */}
+            {/* ================================================= */}
 
             <section className="dashboard-grid">
 
@@ -797,10 +1257,12 @@ function App() {
                 />
 
                 <div className="chart-note">
+
                   FALCON dynamically reduces
                   measurements while maintaining
                   decision agreement with the
                   fixed-rate reference.
+
                 </div>
 
               </div>
@@ -869,6 +1331,7 @@ function App() {
                       title,
                       description,
                     ]) => (
+
                       <div
                         className="pipeline-step"
                         key={number}
@@ -891,6 +1354,7 @@ function App() {
                         </div>
 
                       </div>
+
                     )
                   )}
 
@@ -900,7 +1364,17 @@ function App() {
 
             </section>
 
+            {/* ================================================= */}
+            {/* ADAPTIVE SAMPLING TRACE */}
+            {/* ================================================= */}
+
+            <AdaptiveTrace
+              results={components}
+            />
+
+            {/* ================================================= */}
             {/* COMPONENT RESULTS */}
+            {/* ================================================= */}
 
             <section className="panel results-panel">
 
@@ -919,6 +1393,7 @@ function App() {
                 </div>
 
                 <div className="threshold-display">
+
                   Anomaly threshold
 
                   <strong>
@@ -1021,39 +1496,50 @@ function App() {
 
                         const sampledPercent =
                           Math.round(
-                            (measurements /
+                            (
+                              measurements /
                               Math.max(
                                 totalPoints,
                                 1
-                              )) *
+                              )
+                            ) *
                               100
                           );
 
                         return (
+
                           <tr key={id}>
 
                             <td>
+
                               <span className="component-id">
                                 {id}
                               </span>
+
                             </td>
 
                             <td>
+
                               <StatusBadge
                                 status={truth}
                               />
+
                             </td>
 
                             <td>
+
                               <StatusBadge
                                 status={fixed}
                               />
+
                             </td>
 
                             <td>
+
                               <StatusBadge
                                 status={falcon}
                               />
+
                             </td>
 
                             <td className="score-cell">
@@ -1083,15 +1569,19 @@ function App() {
                             <td>
 
                               <div className="evidence">
+
                                 {sampledPercent}%
                                 {" "}
                                 sampled
+
                               </div>
 
                             </td>
 
                           </tr>
+
                         );
+
                       }
                     )}
 
@@ -1103,7 +1593,9 @@ function App() {
 
             </section>
 
+            {/* ================================================= */}
             {/* TECHNICAL FOOTER */}
+            {/* ================================================= */}
 
             <section className="technical-footer">
 
@@ -1136,11 +1628,14 @@ function App() {
             </section>
 
           </>
+
         )}
 
       </main>
 
+      {/* ================================================== */}
       {/* FOOTER */}
+      {/* ================================================== */}
 
       <footer>
 
