@@ -1,0 +1,65 @@
+{
+  "note": "Simulation result only; not an industrial performance claim.",
+  "threshold": 3.9765916644353294,
+  "components": [
+    {
+      "component": "C01",
+      "ground_truth": "NORMAL",
+      "fixed_decision": "NORMAL",
+      "falcon_decision": "NORMAL",
+      "fixed_measurements": 101,
+      "falcon_measurements": 74,
+      "fixed_score": 0.5710080342497479,
+      "falcon_score": 0.5930626793503344,
+      "classification_agreement": true
+    },
+    {
+      "component": "C02",
+      "ground_truth": "NORMAL",
+      "fixed_decision": "NORMAL",
+      "falcon_decision": "NORMAL",
+      "fixed_measurements": 101,
+      "falcon_measurements": 72,
+      "fixed_score": 0.37891385482747386,
+      "falcon_score": 0.3387304189191242,
+      "classification_agreement": true
+    },
+    {
+      "component": "C03",
+      "ground_truth": "NORMAL",
+      "fixed_decision": "NORMAL",
+      "falcon_decision": "NORMAL",
+      "fixed_measurements": 101,
+      "falcon_measurements": 71,
+      "fixed_score": 0.019192328538293436,
+      "falcon_score": 0.02686327754940331,
+      "classification_agreement": true
+    },
+    {
+      "component": "C04",
+      "ground_truth": "NORMAL",
+      "fixed_decision": "NORMAL",
+      "falcon_decision": "NORMAL",
+      "fixed_measurements": 101,
+      "falcon_measurements": 73,
+      "fixed_score": 0.1933815562841173,
+      "falcon_score": 0.16041370860881335,
+      "classification_agreement": true
+    },
+    {
+      "component": "C05",
+      "ground_truth": "ANOMALOUS",
+      "fixed_decision": "ANOMALOUS",
+      "falcon_decision": "ANOMALOUS",
+      "fixed_measurements": 101,
+      "falcon_measurements": 63,
+      "fixed_score": 153.42430751264348,
+      "falcon_score": 152.7812116215141,
+      "classification_agreement": true
+    }
+  ],
+  "total_fixed_measurements": 505,
+  "total_falcon_measurements": 353,
+  "simulated_measurement_reduction": 0.30099009900990104,
+  "classification_agreement": 1.0
+}
