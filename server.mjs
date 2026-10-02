@@ -199,7 +199,7 @@ async function llm(input) {
         input: JSON.stringify(context, null, 2),
         system_instruction: system,
         store: false,
-        generation_config: { max_output_tokens: input.healthCheck ? 32 : 1400, thinking_level: input.healthCheck ? 'minimal' : 'low' }
+        generation_config: { max_output_tokens: input.healthCheck ? 32 : 1400, thinking_level: input.healthCheck ? 'low' : 'low' }
       })
     });
     const d = await r.json().catch(() => ({}));
