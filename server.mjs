@@ -175,56 +175,73 @@ function stopDemo() {
 }
 
 async function llm(input) {
-  if (!key) return { error: 'Gemini is not configured. Put your Gemini API key in .env as GEMINI_API_KEY=... and restart the backend.', model };
+  if (!key) return { error: 'Engineering intelligence is not configured on the backend.' };
 
-  const system = `You are FALCON, an engineering AI copilot for SIH26170 component burn-in and screening. Be evidence-bound. Never invent measurements, component specifications, model accuracy, training results, failure rates, or industrial validation. Distinguish measured telemetry, deterministic calculations, demo simulation evidence, model outputs, assumptions and missing evidence. A component part number is identity only, not telemetry. If evidence is insufficient, explicitly state what is missing. Keep final engineering decisions human-controlled. Use concise engineering language and structure answers with Facts, Interpretation, Limitations, Next action when appropriate.`;
+  const system = `You are FALCON, an engineering intelligence copilot for SIH26170 component burn-in and screening. Be evidence-bound. Never invent measurements, component specifications, model accuracy, training results, failure rates, or industrial validation. Distinguish measured telemetry, deterministic calculations, demo simulation evidence, model outputs, assumptions and missing evidence. A component part number is identity only, not telemetry. If evidence is insufficient, explicitly state what is missing. Keep final engineering decisions human-controlled. Use concise engineering language and structure answers with Facts, Interpretation, Limitations, Next action when appropriate.`;
   const context = {
     mode: input.mode || 'copilot', question: input.question || '', page: input.page || '',
     component: input.component || null, telemetry: (input.telemetry || []).slice(-60),
     prompt: input.prompt || '', demoMode: Boolean(input.demoMode)
   };
 
-  // Gemini 3.8 Flash is served through the current Interactions API.
-  // Keep this server-side so the browser never receives the API key.
+  const models = [model, 'gemini-2.5-flash'].filter((m, i, a) => m && a.indexOf(m) === i);
   const url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        input: JSON.stringify(context, null, 2),
-        system_instruction: system,
-        store: false,
-        generation_config: { max_output_tokens: input.healthCheck ? 32 : 1400, thinking_level: input.healthCheck ? 'low' : 'low' }
-      })
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const message = d?.error?.message || `Gemini HTTP ${r.status}`;
-      return { error: `${message} [model: ${model}]`, model, provider: 'Google Gemini Interactions API' };
+
+  for (const activeModel of models) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), input.healthCheck ? 18000 : 30000);
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: activeModel,
+          input: JSON.stringify(context, null, 2),
+          system_instruction: system,
+          store: false,
+          generation_config: {
+            max_output_tokens: input.healthCheck ? 64 : 1400,
+            thinking_level: 'low'
+          }
+        })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const status = Number(r.status);
+        // Capacity/rate-limit/server errors can transparently try the backup model.
+        if ([429, 500, 502, 503, 504].includes(status) && activeModel !== models.at(-1)) continue;
+        const message = d?.error?.message || `Intelligence service HTTP ${status}`;
+        return { error: sanitizeIntelligenceError(message) };
+      }
+
+      const text = d?.output_text ||
+        d?.steps?.filter(step => step?.type === 'model_output')
+          ?.flatMap(step => Array.isArray(step.content) ? step.content : [])
+          ?.filter(part => part?.type === 'text' && part?.text)
+          ?.map(part => part.text).join('') ||
+        d?.outputs?.flatMap(o => Array.isArray(o?.content) ? o.content : [])
+          ?.filter(part => part?.type === 'text' && part?.text)
+          ?.map(part => part.text).join('') || '';
+
+      return { text: String(text).trim() || 'The intelligence service completed without a text response.' };
+    } catch (e) {
+      if (e?.name === 'AbortError' && activeModel !== models.at(-1)) continue;
+      return { error: e?.name === 'AbortError' ? 'Engineering intelligence request timed out. Please retry.' : 'Engineering intelligence request failed. Please retry.' };
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const text = d?.output_text ||
-      d?.steps?.filter(step => step?.type === 'model_output')
-        ?.flatMap(step => Array.isArray(step.content) ? step.content : [])
-        ?.filter(part => part?.type === 'text' && part?.text)
-        ?.map(part => part.text).join('') ||
-      d?.outputs?.flatMap(o => Array.isArray(o?.content) ? o.content : [])
-        ?.filter(part => part?.type === 'text' && part?.text)
-        ?.map(part => part.text).join('') || '';
-
-    return { text: String(text).trim() || 'Gemini completed without a text response.', model, provider: 'Google Gemini Interactions API' };
-  } catch (e) {
-    return { error: e?.name === 'AbortError' ? `Gemini request timed out after 30s [model: ${model}]` : `Gemini request failed: ${e?.message || e} [model: ${model}]`, model, provider: 'Google Gemini Interactions API' };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return { error: 'Engineering intelligence is temporarily unavailable. Please retry.' };
 }
 
+function sanitizeIntelligenceError(message) {
+  return String(message || 'Engineering intelligence request failed.')
+    .replace(/gemini[^\s\]]*/gi, 'intelligence service')
+    .replace(/google\s+gemini/gi, 'intelligence service')
+    .replace(/interactions\s*api/gi, 'intelligence service');
+}
 async function logoDataUri() {
   try {
     const b = await fs.readFile(logoPath);
@@ -280,8 +297,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/health') return json(res, 200, {
       ok: true, uptime: process.uptime(), liveClients: clients.size, telemetrySamples: telemetry.length,
-      demoRunning, demoScenario, geminiConfigured: Boolean(key), geminiModel: model,
-      memory: process.memoryUsage().rss, capabilities: { telemetry: true, sse: true, demoSimulation: true, arrhenius: true, reports: true, llm: Boolean(key), auth: true, mlCalibrationRequired: true }
+      demoRunning, demoScenario, intelligenceConfigured: Boolean(key),
+      memory: process.memoryUsage().rss, capabilities: { telemetry: true, sse: true, demoSimulation: true, arrhenius: true, reports: true, intelligence: Boolean(key), auth: true, mlCalibrationRequired: true }
     });
     if (req.method === 'GET' && req.url === '/api/stream') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
@@ -311,9 +328,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && req.url === '/api/ai/ping') {
       const session = requireAuth(req, res); if (!session) return;
-      if (!key) return json(res, 200, { ok: false, configured: false, model, error: 'GEMINI_API_KEY is missing.' });
+      if (!key) return json(res, 200, { ok: false, configured: false, error: 'Engineering intelligence is not configured on the backend.' });
       const result = await llm({ healthCheck: true, mode: 'health', question: 'Respond with exactly: FALCON AI ONLINE' });
-      return json(res, 200, { ok: Boolean(result.text), configured: true, model, provider: result.provider, error: result.error || null, text: result.text || null });
+      return json(res, 200, { ok: Boolean(result.text), configured: true, error: result.error || null, text: result.text || null });
     }
     if (req.method === 'POST' && req.url === '/api/report') {
       const session = requireAuth(req, res); if (!session) return;

@@ -493,3 +493,61 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;back
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
 }
+
+/* ================================================================
+   FALCON // MOTION STABILITY PATCH
+   GPU-friendly motion, no white flashes, no filter-heavy animation.
+   ================================================================ */
+.ai-fab,
+.ai-fab > span,
+.ai-panel,
+.page,
+.login-card,
+.logo-stage img,
+.primary,
+.stat-sweep,
+.signal-line,
+.pipeline .pipe:before,
+.premium-pipeline .pipe:after,
+.logo-scan-beam,
+.login-scan,
+.login-stars,
+body:before {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.page{animation:pageRiseSmooth .55s cubic-bezier(.22,1,.36,1) both}
+@keyframes pageRiseSmooth{from{opacity:0;transform:translate3d(0,10px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+
+.logo-stage img{animation:logoFloatSmooth 5.5s ease-in-out infinite!important;filter:drop-shadow(0 18px 35px #22d3ee24) saturate(1.1)!important}
+@keyframes logoFloatSmooth{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-4px,0) scale(1.008)}}
+
+.ai-fab{animation:aiFloatSmooth 4s ease-in-out infinite!important;will-change:transform}
+@keyframes aiFloatSmooth{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-6px,0)}}
+.ai-fab>span{animation:aiCoreSmooth 3s ease-in-out infinite!important;will-change:transform}
+@keyframes aiCoreSmooth{0%,100%{transform:translate3d(0,0,0) rotate(0) scale(1)}50%{transform:translate3d(0,-1px,0) rotate(6deg) scale(1.04)}}
+
+.ai-panel{animation:panelInSmooth .32s cubic-bezier(.22,1,.36,1) both;will-change:transform,opacity}
+@keyframes panelInSmooth{from{opacity:0;transform:translate3d(24px,0,0) scale(.985)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+.ai-backdrop{animation:fadeInSmooth .2s ease-out both;will-change:opacity}
+@keyframes fadeInSmooth{from{opacity:0}to{opacity:1}}
+
+/* Keep moving highlights subtle instead of bright white flashes. */
+.meter i:after{background:linear-gradient(90deg,transparent,#a9c7ff2e,transparent)!important;animation:meterShineSmooth 3.2s ease-in-out infinite!important}
+@keyframes meterShineSmooth{0%,15%{transform:translate3d(-120%,0,0)}65%,100%{transform:translate3d(120%,0,0)}}
+
+/* Avoid expensive blur/filter animation during normal navigation. */
+.signal-line{animation:signalDrawSmooth 1.35s cubic-bezier(.22,1,.36,1) forwards!important;filter:none!important}
+@keyframes signalDrawSmooth{to{stroke-dashoffset:0}}
+
+/* Prevent animated pseudo-elements from creating white/composited flashes. */
+.premium-ai:before{opacity:.82;will-change:transform;animation:borderSpinSmooth 8s linear infinite!important}
+@keyframes borderSpinSmooth{to{transform:rotate(360deg)}}
+.decision-card:before{animation:borderFlowSmooth 7s linear infinite!important}
+@keyframes borderFlowSmooth{0%,100%{opacity:.55}50%{opacity:.82}}
+
+@media (prefers-reduced-motion: reduce){
+  .ai-fab,.ai-fab>span,.ai-panel,.page,.login-card,.logo-stage img,.primary,.signal-line,.pipeline .pipe:before,.premium-pipeline .pipe:after,.logo-scan-beam,.login-scan,.login-stars,body:before,.premium-ai:before,.decision-card:before{animation:none!important;transition:none!important;transform:none!important}
+}
