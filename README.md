@@ -20,18 +20,9 @@ FALCON is a local engineering dashboard for component burn-in/screening. This bu
 - Dark/light theme
 - Responsive UI and reduced-motion support
 
-## Start on macOS
+## Start on macOS or Windows
 
-```bash
-cd ~/Desktop
-unzip -o FALCON_SIH26170_ULTIMATE_TOP_NOTCH.zip -d falcon_ultimate
-cd falcon_ultimate
-cp .env.example .env
-npm install
-./start_falcon.command
-```
-
-Open: http://localhost:5173
+Open: https://falcon-one-theta.vercel.app/
 
 ## Demo login
 
@@ -45,7 +36,6 @@ Admin:
 - Username: `admin`
 - Password: `FALCON@2026`
 
-Change these values in `.env` before using the project outside the demo environment.
 
 ## Gemini AI
 
